@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="es" data-build="v10">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#06080f">
+<meta name="description" content="OpenCode aplicado a la educación: cómo una herramienta de inteligencia artificial acompaña el aprendizaje del estudiante dentro del aula, en lugar de sustituirlo.">
+<title>OpenCode aplicado a la Educación</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   TOKENS
+   ========================================================================== */
+:root{
+  --ink:#06080f;
+  --blue:#5b8cf6;
+  --blue-soft:rgba(91,140,246,.13);
+  --amber:#f0b429;
+  --rose:#f07171;
+  --green:#3ecf8e;
+  --text:#eef2f8;
+  --muted:#98a5bb;
+  --dim:#5f6b80;
+  --hair:rgba(255,255,255,.075);
+  --surface:rgba(255,255,255,.028);
+  --surface2:rgba(255,255,255,.05);
+  --sans:'Inter','Segoe UI',sans-serif;
+  --display:'Plus Jakarta Sans','Inter',sans-serif;
+  --serif:'Instrument Serif',Georgia,serif;
+  --mono:'JetBrains Mono',Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  font-family:var(--sans);background:var(--ink);color:var(--text);
+  overflow:hidden;position:relative;-webkit-font-smoothing:antialiased;
+}
+
+/* ==========================================================================
+   FONDO · capas fijas de z-index bajo
+   ========================================================================== */
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+.bg .glow{position:absolute;border-radius:50%;filter:blur(130px);opacity:.4;}
+.bg .g1{width:56vw;height:56vw;left:-20vw;top:-22vw;background:radial-gradient(circle,#1d4ed8,transparent 65%);animation:glowA 26s ease-in-out infinite;}
+.bg .g2{width:46vw;height:46vw;right:-18vw;bottom:-20vw;background:radial-gradient(circle,#5b21b6,transparent 65%);animation:glowB 30s ease-in-out infinite;}
+@keyframes glowA{50%{transform:translate(10vw,9vw) scale(1.14);}}
+@keyframes glowB{50%{transform:translate(-9vw,-8vw) scale(1.1);}}
+.bg .grid{
+  position:absolute;inset:0;
+  background:
+    linear-gradient(rgba(255,255,255,.026) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.026) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(ellipse 70% 60% at 50% 45%,#000 20%,transparent 78%);
+  -webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 45%,#000 20%,transparent 78%);
+}
+.bg .noise{position:absolute;inset:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");}
+.vignette{position:fixed;inset:0;z-index:2;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 48%,rgba(3,5,10,.8) 100%);}
+
+/* ==========================================================================
+   ESCENARIO
+   ========================================================================== */
+#viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:3}
+#stage{position:relative;width:1280px;height:720px;flex:none;transform-origin:center center}
+
+/* ==========================================================================
+   DIAPOSITIVA · blindaje de layout (esto es lo que evita los solapamientos)
+   ========================================================================== */
+.slide{position:absolute;inset:0;padding:76px 96px 84px;display:none;flex-direction:column}
+.slide.active{display:flex}
+.slide > *{flex:0 0 auto}
+.slide > .slide-head{flex:0 0 auto}
+.slide > .body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:flex-start}
+.slide > .body > .grid{flex:1 1 auto;align-content:stretch;grid-auto-rows:1fr}
+.slide > .body > .modes{flex:1 1 auto;grid-auto-rows:1fr}
+.slide > .body > .grid > .card{display:flex;flex-direction:column;justify-content:center}
+.slide > .body > .rows{flex:1 1 auto;min-height:0}
+
+/* pie: banda reservada, el contenido nunca la toca */
+.foot{position:absolute;left:96px;right:96px;bottom:34px;z-index:4;
+  display:flex;justify-content:space-between;align-items:center;
+  background:var(--ink);padding-top:14px;border-top:1px solid var(--hair);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);}
+.foot b{color:#7e9ee8;font-weight:600}
+.foot::before{content:'';position:absolute;left:0;right:0;top:-24px;height:24px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(6,8,15,0),rgba(6,8,15,.94));}
+.cover{padding-bottom:118px}
+.end{padding:70px 96px 118px}
+
+/* ==========================================================================
+   TIPOGRAFÍA
+   ========================================================================== */
+.eyebrow{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.32em;
+  text-transform:uppercase;color:var(--dim);display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.eyebrow .bar{width:26px;height:1px;background:var(--blue);opacity:.55}
+.slide-head{margin-bottom:32px}
+h1,h2{font-family:var(--display);font-weight:800;letter-spacing:-.035em;line-height:1.1;color:var(--text)}
+h2{font-size:45px;max-width:1040px}
+h1{font-size:44px;max-width:1010px}
+em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--blue);letter-spacing:-.005em;font-size:1.05em}
+.sub{font-size:17px;line-height:1.6;color:var(--muted);font-weight:300;margin-top:18px;max-width:870px}
+
+/* ==========================================================================
+   RAILS DE MARGEN · la retícula editorial, apenas insinuada
+   ========================================================================== */
+.stage-marg{position:absolute;top:0;bottom:0;width:1px;z-index:0;pointer-events:none;
+  background:linear-gradient(180deg,transparent,rgba(147,178,255,.1) 13%,rgba(147,178,255,.1) 84%,transparent)}
+.stage-marg.l{left:96px}
+.stage-marg.r{right:96px}
+
+/* ==========================================================================
+   PORTADA
+   ========================================================================== */
+.cover{justify-content:center}
+.brandline{display:flex;align-items:center;gap:14px;margin-bottom:44px}
+.brandline .mk{width:46px;height:46px;display:grid;place-items:center;flex:none}
+.brandline .mk svg{width:30px;height:30px;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.brandline .tx{font-family:var(--mono);font-size:11px;letter-spacing:.34em;color:var(--dim)}
+.cover h1{font-size:70px;line-height:1.06;max-width:none}
+.cover .lead{font-size:19px;line-height:1.62;color:var(--muted);font-weight:300;max-width:764px;margin-top:26px}
+/* ancla gráfica: la marca grande, casi desvaída, se sale por la derecha */
+.cover-art{position:absolute;right:-168px;top:50%;z-index:0;pointer-events:none;
+  width:560px;height:560px;transform:translateY(-50%)}
+.cover-art svg{width:100%;height:100%;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.cover-art .hexa{stroke:rgba(91,140,246,.16);stroke-width:.9}
+.cover-art .spoke{stroke:rgba(147,178,255,.11);stroke-width:.7}
+.cover-art .ringo{stroke:rgba(147,178,255,.1);stroke-width:.7}
+.cover-art .ringi{stroke:rgba(147,178,255,.08);stroke-width:.6;stroke-dasharray:1.4 5.6}
+.cover-art .node{fill:rgba(147,178,255,.13);stroke:none}
+.cover-art .core{fill:rgba(91,140,246,.28);stroke:none}
+.cover-art .spin{transform-box:fill-box;transform-origin:center;animation:coverSpin 150s linear infinite}
+@keyframes coverSpin{to{transform:rotate(360deg)}}
+.end .meta{margin-top:0;flex:0 0 auto}
+.end .rules + .meta{margin-top:26px}
+.cover .lead b{color:var(--text);font-weight:500}
+.meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:46px}
+.tagchip{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--dim);
+  border:1px solid var(--hair);border-radius:999px;padding:10px 18px}
+.tagchip b{color:var(--muted);font-weight:500}
+code.k{font-family:var(--mono);font-size:12.5px;background:var(--blue-soft);
+  border:1px solid rgba(91,140,246,.28);color:#8fb3ff;padding:2px 8px;border-radius:6px;white-space:nowrap}
+
+/* ==========================================================================
+   TARJETAS · sin caja: solo el filete de acento y el texto centrado
+   ========================================================================== */
+.grid{display:grid;gap:26px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+/* cuatro tarjetas en 2×2: en una sola fila el texto queda partido y la lámina vacía */
+.g22{grid-template-columns:repeat(2,1fr);gap:14px 68px}
+.card{position:relative;padding-top:22px;transition:opacity .3s ease}
+.card::before{content:'';position:absolute;left:0;top:0;width:32px;height:2px;background:var(--blue);opacity:.75;border-radius:2px;transition:opacity .3s ease}
+.card:hover::before{opacity:1}
+.card:hover h3{color:#fff}
+.card.risk::before{background:var(--rose)}
+/* NUMEROS COMO ELEMENTO GRAFICO
+   el dígito va en display, contorneado: da jerarquía sin gritar */
+.gn{display:block;font-family:var(--display);font-weight:800;letter-spacing:-.05em;line-height:.9;
+  color:transparent;-webkit-text-stroke:1px rgba(91,140,246,.55);margin-bottom:16px}
+.card .num{display:block;font-size:28px;color:transparent;-webkit-text-stroke:1px rgba(91,140,246,.55);margin-bottom:10px}
+.card.risk .num{-webkit-text-stroke-color:rgba(240,113,113,.55)}
+.card h3{font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:-.022em;color:var(--text);line-height:1.3;margin-bottom:12px}
+.card p{font-size:15.5px;line-height:1.64;color:var(--muted);font-weight:300}
+/* en 2×2 los párrafos se igualan a dos líneas: los títulos quedan alineados */
+.g22 .card p{min-height:3.28em;line-height:1.56}
+.g22 .card h3{margin-bottom:10px}
+
+/* ==========================================================================
+   FILAS · la lámina del problema
+   ========================================================================== */
+/* FILAS · la lámina del problema: el número manda, la línea se acorta */
+.rows{display:flex;flex-direction:column;justify-content:space-between}
+.rows .r{display:flex;gap:26px;align-items:baseline;padding:20px 0;border-top:1px solid var(--hair)}
+.rows .r .k{font-family:var(--display);font-size:34px;font-weight:800;letter-spacing:-.05em;line-height:1;
+  color:transparent;-webkit-text-stroke:1px rgba(91,140,246,.6);flex:none;width:48px}
+.rows .r .tx b{display:block;font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-.018em;margin-bottom:8px;color:var(--text)}
+.rows .r .tx span{font-size:15.5px;line-height:1.6;color:var(--muted);font-weight:300}
+
+/* ==========================================================================
+   CIFRAS · la lámina de la herramienta
+   ========================================================================== */
+/* la regla superior se dibuja: por eso es un pseudoelemento y no un border */
+.stats{position:relative;display:grid;grid-template-columns:repeat(4,1fr);border-top:0}
+.stats::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;background:var(--hair);
+  transform-origin:left center;transform:scaleX(0)}
+.stat{padding:30px 28px;border-right:1px solid var(--hair)}
+.stat:first-child{padding-left:0}
+.stat:last-child{border-right:0}
+.stat .v{font-family:var(--display);font-size:54px;font-weight:800;letter-spacing:-.045em;line-height:1;color:var(--text);font-variant-numeric:tabular-nums}
+.stat .v b{font:inherit;letter-spacing:inherit}
+/* el sufijo va en su propio nodo, en superíndice: nunca pegado al número */
+.stat .v span{display:inline-block;font-size:.42em;letter-spacing:0;color:var(--blue);
+  margin-left:.06em;transform:translateY(-.62em)}
+.stat .k{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-top:18px}
+
+/* ==========================================================================
+   MODOS · la lámina de la tecla Tab
+   ========================================================================== */
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:56px}
+/* el Tab es lo único que separa los dos modos: un punto une las columnas */
+.modes.toggle{position:relative}
+.modes.toggle::before{content:'';position:absolute;top:4px;bottom:4px;left:50%;width:1px;
+  transform:translateX(-50%);pointer-events:none;
+  background:repeating-linear-gradient(180deg,rgba(147,178,255,.26) 0 3px,transparent 3px 10px)}
+.mode{position:relative;padding-top:30px;display:flex;flex-direction:column}
+.mode::before{content:'';position:absolute;left:0;right:0;top:0;height:2px;background:var(--hair);
+  transform-origin:left center}
+.mode.b::before{background:var(--blue)}
+.mode .badge{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.28em;text-transform:uppercase;color:var(--dim);margin-bottom:18px}
+.mode.b .badge{color:var(--blue)}
+.mode .key{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--dim);
+  border:1px solid var(--hair);border-radius:5px;padding:4px 9px}
+.mode.b .key{color:var(--blue);border-color:rgba(91,140,246,.32)}
+.mode h3{font-family:var(--display);font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1.2;color:var(--text);margin-bottom:12px}
+.mode p{font-size:15.5px;line-height:1.6;color:var(--muted);font-weight:300;max-width:96%}
+.mode p b{color:var(--text);font-weight:500}
+.mode ul{margin-top:20px;border-top:1px solid var(--hair);padding-top:4px}
+.mode li{list-style:none;font-size:14.5px;line-height:1.52;color:var(--muted);font-weight:300;padding:9px 0 9px 18px;position:relative}
+.mode li::before{content:'';position:absolute;left:2px;top:17px;width:4px;height:4px;border-radius:50%;background:var(--dim)}
+.mode.b li::before{background:var(--blue)}
+
+/* variante de dos columnas sin párrafo (la lámina del impacto) */
+.slide > .body > .grid > .mode{justify-content:center}
+/* los rótulos de columna de la lámina 7 suben a display: ahí está la jerarquía */
+.mode.cols .badge{display:block;font-family:var(--display);font-size:25px;font-weight:800;
+  letter-spacing:-.025em;text-transform:none;color:var(--text);margin-bottom:6px}
+.mode.cols .badge::after{content:'';display:block;width:26px;height:2px;background:var(--hair);margin-top:14px}
+.mode.b.cols .badge::after{background:var(--blue)}
+.mode.cols ul{margin-top:24px}
+/* las dos columnas miden lo mismo: los ítems quedan a la misma altura */
+.mode.cols li{padding:10px 0 10px 18px;font-size:15px;line-height:1.55;min-height:66px;display:flex;align-items:flex-start}
+.mode.cols li::before{top:18px}
+
+/* ==========================================================================
+   AVISOS · solo una línea de acento, sin caja
+   ========================================================================== */
+/* la línea de acento se dibuja de arriba abajo: también es pseudoelemento */
+.callout{position:relative;margin-top:20px;padding:2px 0 2px 24px;border-left:0}
+.callout::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--blue);transform-origin:center top;transform:scaleY(0)}
+.callout.warn::before{background:var(--rose)}
+.callout b{display:block;font-family:var(--display);font-size:17px;font-weight:700;letter-spacing:-.018em;color:var(--text);margin-bottom:7px}
+.callout span{font-size:15px;line-height:1.6;color:var(--muted);font-weight:300;max-width:1010px}
+
+/* ==========================================================================
+   CIERRE · las cuatro reglas en 2x2
+   ========================================================================== */
+.rules{flex:1 1 auto;display:grid;grid-template-columns:repeat(2,1fr);gap:56px 68px;align-content:space-evenly}
+.rule{position:relative;padding-top:22px;display:flex;gap:18px;align-items:flex-start}
+.rule::before{content:'';position:absolute;left:0;top:0;width:32px;height:2px;background:var(--blue);opacity:.75}
+.rule .n{font-family:var(--display);font-size:30px;font-weight:800;letter-spacing:-.04em;line-height:1.1;
+  color:transparent;-webkit-text-stroke:1px rgba(91,140,246,.55);flex:none;width:36px}
+.rule b{display:block;font-family:var(--display);font-size:19px;font-weight:700;letter-spacing:-.018em;line-height:1.34;color:var(--text);margin-bottom:7px}
+.rule span{font-size:15px;line-height:1.58;color:var(--muted);font-weight:300}
+.slide.active .rules > .rule::before{animation:draw32 .55s cubic-bezier(.16,1,.3,1) both;
+  animation-delay:calc(250ms + var(--k,0) * 92ms)}
+
+/* ==========================================================================
+   INTERFAZ DE OPENCODE · la lámina 4
+   ========================================================================== */
+@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:.12}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.oui-wrap{position:relative;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+/* la pantalla no es una "app": es una banda del propio encuadre, a escuadra */
+.oui{
+  flex:1 1 auto;min-height:0;display:grid;grid-template-columns:196px minmax(0,1fr);
+  background:#080a10;border:0;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);
+  overflow:hidden;font-family:var(--mono);
+}
+.oui-side{border-right:1px solid var(--hair);padding:15px 0 0;display:flex;flex-direction:column;background:#07080d}
+.oui-side .sh{display:flex;justify-content:space-between;align-items:center;padding:0 16px 13px}
+.oui-side .sh b{font-size:9.5px;letter-spacing:.22em;color:var(--dim);font-weight:500}
+.oui-side .sh i{font-style:normal;color:var(--dim);font-size:13px;line-height:1}
+.si{display:flex;align-items:center;gap:9px;padding:7px 16px;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si .dt{width:5px;height:5px;border-radius:50%;background:#39404e;flex:none}
+.si.cur{background:rgba(91,140,246,.1);color:var(--text);box-shadow:inset 2px 0 0 var(--blue)}
+.si.cur .dt{background:var(--blue)}
+.oui-side .sf{margin-top:auto;padding:13px 16px 14px;border-top:1px solid var(--hair);font-size:10px;color:var(--dim);letter-spacing:.14em;display:flex;justify-content:space-between}
+.oui-main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.chat{flex:1 1 auto;min-height:0;overflow-y:auto;padding:18px 24px 6px;scrollbar-width:none}
+.chat::-webkit-scrollbar{display:none}
+.m{margin-bottom:15px}
+.m .who{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim);margin-bottom:6px;display:block}
+.m.a .who{color:var(--blue)}
+.m p{font-size:13px;line-height:1.6;color:#d2d9e5;font-family:var(--sans);font-weight:300}
+.m.think{display:flex;align-items:center;gap:9px;margin-bottom:13px}
+.m.think p{color:var(--dim);font-size:12.5px}
+.spin{width:9px;height:9px;border-radius:50%;border:1.5px solid rgba(91,140,246,.28);border-top-color:var(--blue);animation:spin .65s linear infinite;flex:none}
+.tl{display:flex;align-items:center;gap:10px;padding:4px 0 4px 2px}
+.tl .ti{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);border:1px solid var(--hair);border-radius:5px;padding:2px 7px;flex:none}
+.tl .tp{font-size:11.5px;color:#97a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl{padding:4px 0 4px 17px;position:relative;font-size:13px;line-height:1.5;color:#d2d9e5;font-family:var(--sans);font-weight:300}
+.pl::before{content:'';position:absolute;left:2px;top:12px;width:5px;height:5px;border-radius:50%;background:var(--blue)}
+.composer{padding:8px 24px 12px}
+.cbox{border:1px solid rgba(255,255,255,.1);border-radius:0;padding:11px 14px;display:flex;align-items:flex-start;gap:12px;background:rgba(255,255,255,.022)}
+.cbox.plan{border-color:rgba(240,180,41,.5);background:rgba(240,180,41,.055)}
+.cbox .cm{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);flex:none;padding-top:2px}
+.cbox.plan .cm{color:var(--amber)}
+.cbox .ct{font-size:13px;line-height:1.5;color:#e2e8f1;font-family:var(--sans);font-weight:300;flex:1;min-height:20px}
+.cbox .cc{width:1.5px;height:14px;background:var(--blue);flex:none;margin-top:3px;animation:blink .9s steps(1,end) infinite}
+.cbox.plan .cc{background:var(--amber)}
+.sbar{display:flex;justify-content:space-between;align-items:center;padding:9px 24px 11px;border-top:1px solid var(--hair);background:#0a0c13;font-size:10px;letter-spacing:.12em;color:var(--dim)}
+.sbar b{color:var(--muted);font-weight:500}
+.vidbar{height:2px;background:rgba(255,255,255,.06);margin-top:14px}
+#vidfill{height:100%;width:0;background:var(--blue)}
+.replay{position:absolute;top:11px;right:13px;z-index:3;width:26px;height:26px;border:1px solid var(--hair);
+  background:rgba(9,11,17,.9);color:var(--muted);cursor:pointer;font-size:13px;line-height:1;display:grid;place-items:center;padding:0}
+.replay:hover{border-color:rgba(91,140,246,.6);color:var(--blue);background:rgba(91,140,246,.16)}
+
+/* ==========================================================================
+   INTRO CINEMATOGRÁFICA · 8,9 s
+   --------------------------------------------------------------------------
+   0,00 negro            0,10 fundido
+   0,20 academy leader   anillo + dos círculos en sentidos opuestos +
+                         cinco barridos horizontales + obturador + cruz
+   1,95 PICTURE START    2,45 el leader se apaga
+   2,55 whip cut         2,70 línea de pelo
+   2,85 marca hexagonal  3,55 destello anamórfico
+   3,70 título           5,05 filete    5,35 subtítulo   5,75 créditos
+   8,30 cierre           8,50 fuera      8,90 negro
+   ========================================================================== */
+#intro{
+  position:fixed;inset:0;z-index:90;background:#03050a;overflow:hidden;
+  animation:iFadeIn .5s ease .1s both;
+  transition:opacity .5s cubic-bezier(.22,1,.36,1),filter .5s cubic-bezier(.22,1,.36,1),transform .5s cubic-bezier(.22,1,.36,1);
+}
+#intro.out{opacity:0;filter:blur(9px);transform:scale(1.05);pointer-events:none}
+#intro.gone{display:none}
+@keyframes iFadeIn{to{opacity:1}}
+
+/* --- 1 · academy leader --- */
+.i-leader{position:absolute;inset:0;z-index:4;display:grid;place-items:center;opacity:0;
+  animation:iLeader 2.45s linear .1s both;}
+@keyframes iLeader{0%{opacity:0}10%{opacity:1}88%{opacity:1}100%{opacity:0}}
+.i-ring{position:relative;width:min(40vh,316px);height:min(40vh,316px);border-radius:50%;
+  border:1px solid rgba(147,178,255,.24);overflow:hidden;background:#03050a}
+/* los dos círculos giran en sentidos opuestos */
+.i-ring .dot{position:absolute;inset:0;border-radius:50%;pointer-events:none}
+.i-ring .dot.a{border:1px dashed rgba(147,178,255,.32);animation:iSpin 3.4s linear infinite}
+.i-ring .dot.b{inset:22%;border:1px dashed rgba(147,178,255,.2);animation:iSpinBack 2.3s linear infinite}
+@keyframes iSpin{to{transform:rotate(360deg)}}
+@keyframes iSpinBack{to{transform:rotate(-360deg)}}
+/* el cruz central */
+.i-cross{position:absolute;inset:0;pointer-events:none}
+.i-cross i{position:absolute;background:rgba(147,178,255,.2)}
+.i-cross i:nth-child(1){left:0;right:0;top:50%;height:1px}
+.i-cross i:nth-child(2){top:0;bottom:0;left:50%;width:1px}
+/* los cinco barridos horizontales clásicos, encima de todo lo anterior */
+.i-sweeps{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden}
+.i-sweeps i{position:absolute;left:-60%;width:220%;height:2px;background:rgba(147,178,255,.34)}
+.i-sweeps i:nth-child(1){top:19%;animation:iSweep 1.15s linear infinite}
+.i-sweeps i:nth-child(2){top:32%;animation:iSweep 1.15s linear .23s infinite}
+.i-sweeps i:nth-child(3){top:49%;animation:iSweep 1.15s linear .46s infinite}
+.i-sweeps i:nth-child(4){top:66%;animation:iSweep 1.15s linear .69s infinite}
+.i-sweeps i:nth-child(5){top:79%;animation:iSweep 1.15s linear .92s infinite}
+@keyframes iSweep{0%{transform:translateX(0)}55%{transform:translateX(45%)}100%{transform:translateX(90%)}}
+/* el obturador: se cierra en el centro al final y corta a negro */
+.i-shut{position:absolute;inset:0;z-index:4;pointer-events:none}
+.i-shut i{position:absolute;top:0;bottom:0;width:50.5%;background:#03050a;
+  animation:iShutClose 1.5s cubic-bezier(.7,0,.3,1) .9s both}
+.i-shut i:nth-child(1){left:0}
+.i-shut i:nth-child(2){right:0}
+@keyframes iShutClose{
+  0%{transform:translateX(calc(-100% - 2px))}
+  100%{transform:translateX(0)}}
+.i-shut i:nth-child(2){animation-name:iShutCloseR}
+@keyframes iShutCloseR{
+  0%{transform:translateX(calc(100% + 2px))}
+  100%{transform:translateX(0)}}
+.i-shut .eye{position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;
+  border:1px solid rgba(147,178,255,.4);opacity:0;animation:iEye .5s ease .9s both;z-index:5}
+@keyframes iEye{0%{opacity:0;transform:scale(3)}40%{opacity:1}100%{opacity:1;transform:scale(1)}}
+.i-ltxt{position:absolute;left:0;right:0;top:calc(50% + min(20vh,158px));text-align:center;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.42em;color:rgba(147,178,255,.6);
+  opacity:0;animation:iFadeIn .5s ease 1.95s both}
+
+/* --- 2 · whip cut --- */
+.i-whip{position:absolute;inset:0;z-index:7;pointer-events:none;overflow:hidden}
+.i-whip i{position:absolute;left:-30%;right:-30%;height:52%;background:#eef4ff}
+.i-whip i:nth-child(1){top:0;animation:iWhipA .3s cubic-bezier(.65,0,.35,1) 2.55s both}
+.i-whip i:nth-child(2){bottom:0;animation:iWhipB .3s cubic-bezier(.65,0,.35,1) 2.55s both}
+@keyframes iWhipA{0%{transform:translateX(-130%)}46%{transform:translateX(0)}100%{transform:translateX(130%)}}
+@keyframes iWhipB{0%{transform:translateX(130%)}46%{transform:translateX(0)}100%{transform:translateX(-130%)}}
+
+/* --- 3 · fondo de la escena --- */
+.i-vig{position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 18%,rgba(3,5,10,.55) 58%,rgba(3,5,10,.98) 92%)}
+.i-grain{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:iShake 1.1s steps(6,end) infinite}
+@keyframes iShake{
+  0%{transform:translate(0,0)}20%{transform:translate(-1.5%,1%)}40%{transform:translate(1%,-1.5%)}
+  60%{transform:translate(-1%,-1%)}80%{transform:translate(1.5%,1%)}100%{transform:translate(0,0)}}
+.i-hair{position:absolute;left:50%;top:calc(50% - 212px);width:0;height:1px;z-index:4;transform:translate(-50%,-50%);
+  background:linear-gradient(90deg,transparent,rgba(147,178,255,.55),transparent);
+  animation:iHair .85s cubic-bezier(.16,1,.3,1) 2.70s both}
+@keyframes iHair{to{width:min(680px,62vw)}}
+
+/* --- 4 · la marca hexagonal --- */
+.i-mark{position:absolute;left:50%;top:50%;z-index:5;opacity:0;
+  transform:translate(-50%,calc(-50% - 212px));
+  animation:iFadeIn .8s ease 2.85s both,
+            iDriftA 13s ease-in-out 4s infinite;}
+@keyframes iDriftA{
+  from{transform:translate(-50%,calc(-50% - 212px)) translateY(-3.5px)}
+  to  {transform:translate(-50%,calc(-50% - 212px)) translateY(3.5px)}}
+.i-mark svg{width:150px;height:150px;overflow:visible}
+.i-mark svg line,.i-mark svg polygon{fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1}
+.i-mark svg line{stroke:rgba(158,188,255,.88);stroke-width:1.05;animation:iDraw .3s cubic-bezier(.16,1,.3,1) forwards}
+.i-mark svg line:nth-of-type(1){animation-delay:3.12s}
+.i-mark svg line:nth-of-type(2){animation-delay:3.24s}
+.i-mark svg line:nth-of-type(3){animation-delay:3.30s}
+.i-mark svg line:nth-of-type(4){animation-delay:3.36s}
+.i-mark svg line:nth-of-type(5){animation-delay:3.42s}
+.i-mark svg line:nth-of-type(6){animation-delay:3.42s}
+.i-mark svg polygon{stroke:rgba(139,172,255,.62);stroke-width:1.15;animation:iDraw 1.15s cubic-bezier(.16,1,.3,1) 2.85s forwards}
+.i-mark circle{transform-box:fill-box;transform-origin:center;transform:scale(0)}
+.i-mark circle.nd{fill:#dde8fb;animation:iPop .5s cubic-bezier(.16,1,.4,1) forwards}
+.i-mark circle.nd:nth-of-type(1){animation-delay:3.50s}
+.i-mark circle.nd:nth-of-type(2){animation-delay:3.56s}
+.i-mark circle.nd:nth-of-type(3){animation-delay:3.62s}
+.i-mark circle.nd:nth-of-type(4){animation-delay:3.68s}
+.i-mark circle.nd:nth-of-type(5){animation-delay:3.74s}
+.i-mark circle.nd:nth-of-type(6){animation-delay:3.80s}
+.i-mark circle.core{fill:#5b8cf6;filter:drop-shadow(0 0 14px rgba(91,140,246,.95));
+  animation:iPop .45s cubic-bezier(.16,1,.4,1) 3.76s both}
+@keyframes iDraw{to{stroke-dashoffset:0}}
+@keyframes iPop{to{transform:scale(1)}}
+/* destello anamórfico */
+.i-flare{position:absolute;left:50%;top:50%;z-index:5;margin-top:calc(-1px - 212px);
+  width:min(78vw,940px);height:2px;
+  background:linear-gradient(90deg,transparent,rgba(96,160,255,.75) 22%,rgba(235,245,255,1) 50%,rgba(96,160,255,.75) 78%,transparent);
+  filter:blur(1.5px);opacity:0;transform:translateX(-50%) scaleX(.05);
+  animation:iFlare 1.8s cubic-bezier(.16,1,.3,1) 3.55s both;}
+@keyframes iFlare{
+  0%{opacity:0;transform:translateX(-50%) scaleX(.05)}
+  11%{opacity:1;transform:translateX(-50%) scaleX(1)}
+  46%{opacity:.5;transform:translateX(-50%) scaleX(1)}
+  100%{opacity:0;transform:translateX(-50%) scaleX(1.3)}}
+.i-bloom{position:absolute;left:50%;top:50%;z-index:5;
+  width:min(30vh,240px);height:min(30vh,240px);margin:calc(-1 * min(15vh,120px) - 212px) 0 0 calc(-1 * min(15vh,120px));
+  border-radius:50%;filter:blur(34px);opacity:0;
+  background:radial-gradient(circle,rgba(110,170,255,.5),transparent 65%);
+  animation:iBloom 2.4s cubic-bezier(.16,1,.3,1) 3.55s both;}
+@keyframes iBloom{
+  0%{opacity:0;transform:scale(.3)}12%{opacity:.9;transform:scale(1.1)}100%{opacity:0;transform:scale(1.7)}}
+.i-ring2{position:absolute;left:50%;top:50%;z-index:5;width:150px;height:150px;
+  margin:calc(-75px - 212px) 0 0 -75px;border-radius:50%;border:1px solid rgba(91,140,246,.45);opacity:0;
+  animation:iWave 1.6s cubic-bezier(.16,1,.3,1) 3.60s forwards;}
+@keyframes iWave{from{transform:scale(.8);opacity:.7}to{transform:scale(2.9);opacity:0}}
+
+/* --- 5 · el bloque de título --- */
+.i-lock{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding-top:146px;transform-origin:center center;
+  animation:iLockIn .9s cubic-bezier(.16,1,.3,1) 3.70s both,
+            iClose .55s cubic-bezier(.65,0,.35,1) 8.30s both;}
+@keyframes iLockIn{from{opacity:0}to{opacity:1}}
+@keyframes iClose{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.86)}}
+.i-tglow{position:absolute;left:50%;top:calc(50% + 72px);z-index:0;pointer-events:none;
+  width:min(64vw,760px);height:min(26vh,210px);margin:calc(-1 * min(13vh,105px)) 0 0 calc(-1 * min(32vw,380px));
+  background:radial-gradient(ellipse at center,rgba(110,170,255,.17),transparent 68%);
+  filter:blur(22px);opacity:0;animation:iTglow 3.6s cubic-bezier(.16,1,.3,1) 3.70s both;}
+@keyframes iTglow{0%{opacity:0}34%{opacity:1}100%{opacity:.22}}
+.i-word{font-family:var(--display);font-weight:800;color:#fff;white-space:nowrap;
+  font-size:clamp(50px,7.8vw,124px);line-height:1;margin-left:.05em;letter-spacing:.4em;opacity:0;
+  animation:iFocus 2s cubic-bezier(.16,1,.3,1) 3.70s both;}
+@keyframes iFocus{
+  from{opacity:0;transform:scale(1.3);filter:blur(22px);letter-spacing:.5em}
+  64%{opacity:1}
+  to{opacity:1;transform:scale(1);filter:blur(0);letter-spacing:.05em}}
+.i-rule{width:0;height:1px;margin-top:34px;
+  background:linear-gradient(90deg,transparent,rgba(147,178,255,.4),transparent);
+  animation:iRule .85s cubic-bezier(.16,1,.3,1) 5.05s both;}
+@keyframes iRule{to{width:min(520px,50vw)}}
+.i-sub{overflow:hidden;margin-top:24px;padding:3px 0}
+.i-sub em{display:inline-block;transform:translateY(120%);animation:iSub .9s cubic-bezier(.16,1,.3,1) 5.35s both;}
+@keyframes iSub{to{transform:translateY(0)}}
+.i-meta{display:flex;align-items:baseline;gap:20px;margin-top:52px;
+  font-family:var(--mono);font-size:12.5px;letter-spacing:.3em;color:#5c6880;
+  opacity:0;transform:translateY(12px);animation:iMeta 1.1s cubic-bezier(.16,1,.3,1) 5.75s both;}
+@keyframes iMeta{to{opacity:1;transform:none}}
+.i-meta b{color:#d4deee;font-weight:500}
+.i-meta s{text-decoration:none;color:#2c3545}
+
+/* --- HUD --- */
+.brk{position:absolute;z-index:9;width:18px;height:18px;border:1px solid rgba(91,140,246,.2);opacity:0;
+  animation:iFadeIn .7s ease .3s both;}
+.brk.tl{top:22px;left:22px;border-right:none;border-bottom:none}
+.brk.tr{top:22px;right:22px;border-left:none;border-bottom:none}
+.brk.bl{bottom:22px;left:22px;border-right:none;border-top:none}
+.brk.br{bottom:22px;right:22px;border-left:none;border-top:none}
+.hudTxt{position:absolute;z-index:9;font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;
+  color:#3a4557;opacity:0;animation:iFadeIn .9s ease .5s both;white-space:nowrap;}
+.hudTxt.tl2{top:50px;left:52px}
+.hudTxt.tl3{top:50px;right:52px}
+.hudTxt.bl2{bottom:50px;left:52px}
+.hudTxt.br2{bottom:50px;right:52px}
+.hudTxt b{color:#5f6c84;font-weight:500}
+#tc{font-variant-numeric:tabular-nums;color:#4f5c73;letter-spacing:.16em}
+.i-skip{position:absolute;bottom:24px;right:52px;z-index:8;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.22em;color:#333d4e;opacity:0;animation:iFadeIn .8s ease 2.2s both;}
+.i-prog{position:absolute;left:0;bottom:0;height:2px;width:0;z-index:8;
+  background:linear-gradient(90deg,#5b8cf6,rgba(207,224,255,.7));animation:iProg 8.9s linear forwards;}
+@keyframes iProg{to{width:100%}}
+
+/* ==========================================================================
+   CASCADA DE ENTRADA · una sola animación por elemento
+   ========================================================================== */
+.slide.active > *:not(.foot):not(.cover-art),
+.slide.active .slide-head > *,
+.slide.active .body > *{
+  animation:itemIn .78s cubic-bezier(.16,1,.3,1) both;
+  animation-delay:calc(110ms + var(--i,0) * 86ms);
+}
+@keyframes itemIn{
+  from{opacity:0;transform:translateY(var(--enter,26px)) scale(.988);filter:blur(5px)}
+  to  {opacity:1;transform:none;filter:blur(0)}}
+
+/* ---------- 2 · segundo nivel: entra cada bloque por separado ---------- */
+.slide.active .body > .grid > .card,
+.slide.active .body > .grid > .mode,
+.slide.active .body > .modes > .mode,
+.slide.active .rules > .rule{
+  animation:cardIn .66s cubic-bezier(.16,1,.3,1) both;
+  animation-delay:calc(300ms + var(--k,0) * 92ms);
+}
+@keyframes cardIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+
+/* ---------- 3 · tercer nivel: ítems de fila y de lista, uno a uno ---------- */
+.slide.active .rows > .r,
+.slide.active .mode > ul > li{
+  animation:itemIn2 .58s cubic-bezier(.16,1,.3,1) both;
+  animation-delay:calc(430ms + var(--j,0) * 84ms);
+}
+@keyframes itemIn2{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:none}}
+
+/* ---------- 4 · salida con dirección: al retroceder todo baja ---------- */
+.slide.leaving{display:flex!important;animation:itemOut .3s cubic-bezier(.4,0,1,1) both!important;pointer-events:none}
+@keyframes itemOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-14px)}}
+.slide.leaving.back{animation-name:itemOutBack}
+@keyframes itemOutBack{from{opacity:1;transform:none}to{opacity:0;transform:translateY(14px)}}
+
+/* ---------- 5 · las líneas se dibujan ---------- */
+.slide.active .eyebrow .bar{animation:draw26 .62s cubic-bezier(.16,1,.3,1) both}
+@keyframes draw26{from{width:0;opacity:0}to{width:26px;opacity:.55}}
+
+.slide.active .card::before{animation:draw32 .55s cubic-bezier(.16,1,.3,1) both;
+  animation-delay:calc(250ms + var(--k,0) * 92ms)}
+@keyframes draw32{from{width:0}to{width:32px}}
+
+.slide.active .mode::before{animation:drawX .62s cubic-bezier(.16,1,.3,1) both;
+  animation-delay:calc(320ms + var(--k,0) * 92ms)}
+@keyframes drawX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+.slide.active .stats::before{animation:drawX .9s cubic-bezier(.16,1,.3,1) both;
+  animation-delay:calc(340ms + var(--i,0) * 86ms)}
+
+.slide.active .callout::before{animation:drawY .55s cubic-bezier(.16,1,.3,1) both;
+  animation-delay:calc(560ms + var(--i,0) * 86ms)}
+@keyframes drawY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+
+.slide.active .tagchip{animation:chipIn .5s cubic-bezier(.16,1,.3,1) both;
+  animation-delay:calc(620ms + var(--i,0) * 86ms)}
+@keyframes chipIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* con movimiento reducido solo se apagan los bucles ambientales:
+   la cascada es contenido, no adorno, y debe verse igual */
+@media (prefers-reduced-motion:reduce){
+  .bg .glow,.bg .noise,.i-grain,.i-ring .dot,.i-sweeps i,.cover-art .spin{animation:none!important}
+  .bg .noise{opacity:.04}
+}
+
+/* ==========================================================================
+   INTERFAZ DE LA PRESENTACIÓN
+   ========================================================================== */
+#bar{position:fixed;left:0;top:0;height:2px;width:0;background:var(--blue);z-index:20;
+  transition:width .5s cubic-bezier(.22,1,.36,1);box-shadow:0 0 12px rgba(91,140,246,.7)}
+#nav{position:fixed;bottom:18px;right:24px;z-index:20;display:flex;gap:7px}
+#nav button{width:36px;height:36px;border-radius:9px;border:1px solid var(--hair);background:rgba(6,8,15,.7);
+  color:var(--muted);cursor:pointer;font-size:16px;backdrop-filter:blur(8px);display:grid;place-items:center;
+  padding:0;transition:all .2s ease}
+#nav button:hover{border-color:rgba(91,140,246,.55);color:#fff;background:rgba(91,140,246,.18)}
+
+#overview{position:fixed;inset:0;z-index:40;background:rgba(4,6,12,.98);backdrop-filter:blur(20px);
+  display:none;flex-direction:column;padding:40px 46px}
+#overview.on{display:flex}
+#overview h4{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-.02em}
+#overview .hint{font-family:var(--mono);font-size:11px;color:var(--dim);margin:8px 0 26px;letter-spacing:.08em}
+#thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;overflow-y:auto;padding-bottom:20px}
+.thumb{border:1px solid var(--hair);border-radius:12px;padding:18px 20px;cursor:pointer;
+  background:var(--surface);transition:all .2s ease;min-height:104px;display:flex;flex-direction:column;justify-content:space-between}
+.thumb:hover{border-color:rgba(91,140,246,.55);background:var(--blue-soft)}
+.thumb.cur{border-color:var(--blue);background:var(--blue-soft)}
+.thumb .tn{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.18em}
+.thumb .tt{font-family:var(--display);font-size:15px;font-weight:700;letter-spacing:-.015em;line-height:1.3;margin-top:8px}
+
+#notes{position:fixed;left:0;right:0;bottom:0;z-index:30;max-height:44vh;overflow-y:auto;
+  background:rgba(4,6,12,.97);border-top:2px solid var(--amber);padding:26px 34px;display:none;backdrop-filter:blur(16px)}
+#notes.on{display:block}
+#notes .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;color:var(--amber);margin-bottom:10px;text-transform:uppercase}
+#notes p{font-size:16px;line-height:1.7;color:#d4deee;max-width:1050px;font-weight:300}
+
+#help{position:fixed;inset:0;z-index:50;background:rgba(4,6,12,.96);backdrop-filter:blur(16px);display:none;place-items:center}
+#help.on{display:grid}
+#help .box{border:1px solid var(--hair);border-radius:18px;padding:40px 46px;background:var(--surface);min-width:480px}
+#help h3{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:24px}
+#help .row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--hair);font-size:15px;color:var(--muted)}
+#help .row:last-of-type{border:none}
+#help .row span:last-child{display:flex;gap:6px}
+#help .cls{margin-top:26px;text-align:center;font-size:13px;color:var(--dim)}
+kbd{font-family:var(--mono);font-size:12px;background:rgba(255,255,255,.06);border:1px solid var(--hair);color:var(--text);border-radius:6px;padding:3px 9px;font-weight:500}
+#blank{position:fixed;inset:0;z-index:60;background:#000;display:none}
+#blank.on{display:block}
+</style>
+</head>
+<body>
+
+<!-- ==================================================================
+     INTRO CINEMATOGRÁFICA · 8,9 s · clic o tecla para saltar
+     ================================================================== -->
+<div id="intro">
+  <div class="i-vig"></div>
+  <div class="i-grain"></div>
+
+  <!-- ACADEMY LEADER -->
+  <div class="i-leader">
+    <div class="i-ring">
+      <div class="i-cross"><i></i><i></i></div>
+      <div class="dot a"></div>
+      <div class="dot b"></div>
+      <div class="i-sweeps"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="i-shut"><i></i><i></i><span class="eye"></span></div>
+    </div>
+    <div class="i-ltxt">P I C T U R E &nbsp; S T A R T</div>
+  </div>
+
+  <!-- WHIP CUT -->
+  <div class="i-whip"><i></i><i></i></div>
+
+  <div class="i-hair"></div>
+
+  <!-- destello anamórfico -->
+  <div class="i-bloom"></div>
+  <div class="i-flare"></div>
+  <div class="i-ring2"></div>
+
+  <!-- MARCA HEXAGONAL -->
+  <div class="i-mark">
+    <svg viewBox="0 0 120 120" aria-hidden="true">
+      <line pathLength="1" x1="60"  y1="8"   x2="60" y2="60"/>
+      <line pathLength="1" x1="108" y1="34"  x2="60" y2="60"/>
+      <line pathLength="1" x1="108" y1="86"  x2="60" y2="60"/>
+      <line pathLength="1" x1="60"  y1="112" x2="60" y2="60"/>
+      <line pathLength="1" x1="12"  y1="86"  x2="60" y2="60"/>
+      <line pathLength="1" x1="12"  y1="34"  x2="60" y2="60"/>
+      <polygon pathLength="1" points="60,8 108,34 108,86 60,112 12,86 12,34"/>
+      <circle class="nd" cx="60"  cy="8"   r="2.4"/>
+      <circle class="nd" cx="108" cy="34"  r="2.4"/>
+      <circle class="nd" cx="108" cy="86"  r="2.4"/>
+      <circle class="nd" cx="60"  cy="112" r="2.4"/>
+      <circle class="nd" cx="12"  cy="86"  r="2.4"/>
+      <circle class="nd" cx="12"  cy="34"  r="2.4"/>
+      <circle class="core" cx="60" cy="60" r="4.6"/>
+    </svg>
+  </div>
+
+  <!-- BLOQUE DE TÍTULO -->
+  <div class="i-lock">
+    <div class="i-tglow"></div>
+    <div class="i-word">OPENCODE</div>
+    <div class="i-rule"></div>
+    <div class="i-sub"><em>Aplicado a la Educaci&oacute;n</em></div>
+    <div class="i-meta"><b>JUSTIN MENDOZA</b><s>&mdash;</s><span>19 &middot; 10 &middot; 2026</span></div>
+  </div>
+
+  <span class="brk tl"></span><span class="brk tr"></span>
+  <span class="brk bl"></span><span class="brk br"></span>
+  <div class="hudTxt tl2">OPEN <b>SOURCE</b> AGENT</div>
+  <div class="hudTxt tl3">TC <span id="tc">00:00:00:00</span></div>
+  <div class="hudTxt bl2">T&Iacute;TULOS &middot; <b>EDICI&Oacute;N 01</b></div>
+  <div class="hudTxt br2">LANG <b>ES</b></div>
+  <div class="i-skip">PULSA PARA SALTAR</div>
+  <div class="i-prog"></div>
+</div>
+
+<div class="bg">
+  <div class="glow g1"></div>
+  <div class="glow g2"></div>
+  <div class="grid"></div>
+  <div class="noise"></div>
+</div>
+<div class="vignette"></div>
+
+<div id="viewport">
+<div id="stage">
+<div class="stage-marg l"></div>
+<div class="stage-marg r"></div>
+
+<!-- ========== 1 · PORTADA ========== -->
+<section class="slide cover" data-title="Portada" data-notes="Saludo breve. Enuncia el tema exacto: OpenCode aplicado a la educación. Deja claro que no vas a hablar de programación ni de modelos, sino de cómo una herramienta acompaña el aprendizaje de un estudiante dentro del aula. Dura unos 30 segundos.">
+  <div class="cover-art" aria-hidden="true">
+    <svg viewBox="-6 -6 132 132">
+      <circle class="ringo spin" cx="60" cy="60" r="63"/>
+      <circle class="ringi" cx="60" cy="60" r="52"/>
+      <polygon class="hexa" points="60,14 101,37 101,83 60,106 19,83 19,37"/>
+      <line class="spoke" x1="60" y1="14" x2="60" y2="60"/>
+      <line class="spoke" x1="101" y1="37" x2="60" y2="60"/>
+      <line class="spoke" x1="101" y1="83" x2="60" y2="60"/>
+      <line class="spoke" x1="60" y1="106" x2="60" y2="60"/>
+      <line class="spoke" x1="19" y1="83" x2="60" y2="60"/>
+      <line class="spoke" x1="19" y1="37" x2="60" y2="60"/>
+      <circle class="node" cx="60" cy="14" r="2"/>
+      <circle class="node" cx="101" cy="37" r="2"/>
+      <circle class="node" cx="101" cy="83" r="2"/>
+      <circle class="node" cx="60" cy="106" r="2"/>
+      <circle class="node" cx="19" cy="83" r="2"/>
+      <circle class="node" cx="19" cy="37" r="2"/>
+      <circle class="core" cx="60" cy="60" r="4.4"/>
+    </svg>
+  </div>
+  <div class="brandline">
+    <div class="mk">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <polygon points="60,8 108,34 108,86 60,112 12,86 12,34" fill="none" stroke="rgba(91,140,246,.75)" stroke-width="4"/>
+        <line x1="60" y1="8" x2="60" y2="60" stroke="rgba(150,182,255,.9)" stroke-width="3.5"/>
+        <line x1="108" y1="34" x2="60" y2="60" stroke="rgba(150,182,255,.9)" stroke-width="3.5"/>
+        <line x1="108" y1="86" x2="60" y2="60" stroke="rgba(150,182,255,.9)" stroke-width="3.5"/>
+        <line x1="60" y1="112" x2="60" y2="60" stroke="rgba(150,182,255,.9)" stroke-width="3.5"/>
+        <line x1="12" y1="86" x2="60" y2="60" stroke="rgba(150,182,255,.9)" stroke-width="3.5"/>
+        <line x1="12" y1="34" x2="60" y2="60" stroke="rgba(150,182,255,.9)" stroke-width="3.5"/>
+        <circle cx="60" cy="60" r="9" fill="#5b8cf6"/>
+      </svg>
+    </div>
+    <div class="tx">O P E N C O D E</div>
+  </div>
+  <h1>OpenCode<br><em>aplicado a la Educaci&oacute;n</em></h1>
+  <p class="lead">C&oacute;mo una herramienta de inteligencia artificial puede <b>acompañar el aprendizaje</b> de un estudiante dentro del aula, en lugar de sustituirlo.</p>
+  <div class="meta">
+    <div class="tagchip"><b>JUSTIN MENDOZA</b></div>
+    <div class="tagchip">Lunes 19 de octubre de 2026</div>
+  </div>
+  <div class="foot"><span>Portada</span><span><b>01</b> / 09</span></div>
+</section>
+
+<!-- ========== 2 · EL PROBLEMA EN EL AULA ========== -->
+<section class="slide" data-title="El problema en el aula" data-notes="Este es el problema educativo, no técnico. Accounta tres momentos concretos en los que un alumno se queda bloqueado. Da un ejemplo cercano: el alumno llega al día siguiente y ya no pregunta porque se rindió. Cierra anticipando la idea: OpenCode está pensada exactamente para estos tres casos, pero no resuelve la tarea por el estudiante.">
+  <div class="slide-head">
+    <div class="eyebrow"><span class="bar"></span>01 &middot; El problema</div>
+    <h2>El estudiante se queda <em>atascado</em> en tres momentos</h2>
+    <p class="sub">No por falta de esfuerzo. Porque la ayuda llega siempre en el momento equivocado.</p>
+  </div>
+  <div class="body">
+    <div class="rows">
+      <div class="r"><div class="k">01</div><div class="tx"><b>Cuando algo no funciona y no sabe por qu&eacute;</b><span>El programa avisa un error, el alumno busca el mensaje, no lo entiende, se frustra y entrega el taller a medias.</span></div></div>
+      <div class="r"><div class="k">02</div><div class="tx"><b>Cuando la duda llega fuera de horario</b><span>La tutor&iacute;a ya cerr&oacute;. El alumno se queda con la duda hasta el d&iacute;a siguiente y para entonces ya perdi&oacute; el hilo.</span></div></div>
+      <div class="r"><div class="k">03</div><div class="tx"><b>Cuando tiene que leer c&oacute;digo escrito por otros</b><span>En un proyecto real el alumno lee archivos que no escribi&oacute;, y ah&iacute; no hay manual que le diga qu&eacute; hace cada cosa.</span></div></div>
+    </div>
+    <div class="callout">
+      <b>OpenCode est&aacute; pensada exactamente para estos tres casos</b>
+      <span>Y lo importante: no los resuelve haciendo la tarea por el estudiante, sino acompañ&aacute;ndolo paso a paso.</span>
+    </div>
+  </div>
+  <div class="foot"><span>El problema en el aula</span><span><b>02</b> / 09</span></div>
+</section>
+
+<!-- ========== 3 · OPENCODE EN UNA FRASE ========== -->
+<section class="slide" data-title="OpenCode en una frase" data-notes="Esta l&aacute;mina es un trampol&iacute;n, no el centro: presenta la herramienta en treinta segundos y pasa a lo importante. Aclara solo una cosa: OpenCode no es la inteligencia artificial, es el programa que la conecta con el trabajo del estudiante. Las cifras sirven para decir que no es un experimento. No te entretengas aqu&iacute;.">
+  <div class="slide-head">
+    <div class="eyebrow"><span class="bar"></span>02 &middot; La herramienta</div>
+    <h2>OpenCode, <em>en una frase</em></h2>
+    <p class="sub">Es un programa que se conecta a una inteligencia artificial y le permite trabajar sobre los archivos del estudiante: leerlos, corregirlos y explicarlos.</p>
+  </div>
+  <div class="body">
+    <div class="grid g3">
+      <div class="card"><h3>Gratis</h3><p>El programa no cuesta nada y se instala con un solo comando.</p></div>
+      <div class="card"><h3>De c&oacute;digo abierto</h3><p>Cualquiera puede ver c&oacute;mo funciona. Nadie es due&ntilde;o del trabajo del alumno.</p></div>
+      <div class="card"><h3>Se usa donde ya se estudia</h3><p>En la terminal o dentro del editor de c&oacute;digo. No hay que aprender otra plataforma.</p></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="v">208<span>k</span></div><div class="k">Personas en GitHub</div></div>
+      <div class="stat"><div class="v">16<span>M</span></div><div class="k">Usuarios cada mes</div></div>
+      <div class="stat"><div class="v">75<span>+</span></div><div class="k">Modelos de IA</div></div>
+      <div class="stat"><div class="v">0<span>$</span></div><div class="k">Costo del programa</div></div>
+    </div>
+  </div>
+  <div class="foot"><span>La herramienta</span><span><b>03</b> / 09</span></div>
+</section>
+
+<!-- ========== 4 · ASÍ SE VE DENTRO DE UN AULA ========== -->
+<section class="slide" data-video="tape" data-title="Así se ve dentro de un aula" data-notes="Esto es una grabaci&oacute;n de pantalla: deja correr la sesi&oacute;n y cu&eacute;ntala mientras avanza. Se&ntilde;ala la primera l&iacute;nea, cuando lee el proyecto; luego el Tab, que es donde cambia todo; y termina en la &uacute;ltima pregunta, que es el verdadero momento del aprendizaje. Si sobra tiempo, ofrece la demostraci&oacute;n en vivo justo despu&eacute;s.">
+  <div class="slide-head">
+    <div class="eyebrow"><span class="bar"></span>04 &middot; En la pr&aacute;ctica</div>
+    <h2>As&iacute; se ve <em>dentro de un aula</em></h2>
+  </div>
+  <div class="body">
+    <div class="oui-wrap">
+      <button class="replay" id="replay" title="Ver de nuevo">&#8635;</button>
+      <div class="oui">
+        <aside class="oui-side">
+          <div class="sh"><b>SESSIONS</b><i>+</i></div>
+          <div class="si cur"><span class="dt"></span>taller-inventario</div>
+          <div class="si"><span class="dt"></span>practica-arrays</div>
+          <div class="si"><span class="dt"></span>portafolio-web</div>
+          <div class="sf"><span>main</span><span>&#183;&#183;&#183;</span></div>
+        </aside>
+        <div class="oui-main">
+          <div class="chat" id="chat"></div>
+          <div class="composer">
+            <div class="cbox" id="cbox">
+              <span class="cm" id="cmode">build</span>
+              <span class="ct" id="ctext"></span><span class="cc" id="ccaret"></span>
+            </div>
+          </div>
+          <div class="sbar">
+            <span><b id="sbModeTxt">build mode</b> &middot; tab to switch</span>
+            <span>kimi-k2 &middot; 12.4k tokens</span>
+          </div>
+        </div>
+      </div>
+      <div class="vidbar"><div id="vidfill"></div></div>
+    </div>
+    <div class="callout">
+      <b>Lo que hizo el estudiante, no la m&aacute;quina</b>
+      <span>Dijo qu&eacute; quer&iacute;a, corrigi&oacute; el plan, revis&oacute; el resultado y pregunt&oacute; el porqu&eacute;. Esas cuatro cosas siguen siendo trabajo del alumno.</span>
+    </div>
+  </div>
+  <div class="foot"><span>En la pr&aacute;ctica</span><span><b>04</b> / 09</span></div>
+</section>
+
+<!-- ========== 5 · LA TECLA TAB ========== -->
+<section class="slide" data-title="La tecla Tab" data-notes="Esta es la l&aacute;mina m&aacute;s importante de toda la exposici&oacute;n. T&oacute;mate tu tiempo aqu&iacute;. Con una tecla el programa deja de poder escribir archivos y solo propone el plan: el estudiante est&aacute; obligado a leer, corregir y decidir antes de que exista c&oacute;digo. Dilo as&iacute;: si le pides el resultado final te lo da y no aprendes nada; si le pides el plan, tienes que pensar t&uacute;.">
+  <div class="slide-head">
+    <div class="eyebrow"><span class="bar"></span>05 &middot; El detalle clave</div>
+    <h2>Con una tecla se evita <em>copiar sin entender</em></h2>
+  </div>
+  <div class="body">
+    <div class="modes toggle">
+      <div class="mode p">
+        <span class="badge">Modo Plan <span class="key">Tab</span></span>
+        <h3>Pensar primero</h3>
+        <p>El programa <b>no puede escribir archivos</b>. Solo muestra su propuesta en pantalla.</p>
+        <ul>
+          <li>Dice qu&eacute; archivos va a crear o cambiar</li>
+          <li>Explica por qu&eacute; eligi&oacute; esa soluci&oacute;n</li>
+          <li>El estudiante corrige lo que no le convence</li>
+        </ul>
+      </div>
+      <div class="mode b">
+        <span class="badge">Modo Build <span class="key">Tab</span></span>
+        <h3>Ejecutar lo acordado</h3>
+        <p>Ahora s&iacute; escribe dentro del proyecto, siguiendo exactamente el plan que el estudiante aprob&oacute;.</p>
+        <ul>
+          <li>Aplica los cambios uno por uno</li>
+          <li>Muestra qu&eacute; archivo modific&oacute;</li>
+          <li>Se deshace con <code class="k">/undo</code> si no era lo esperado</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout">
+      <b>La diferencia est&aacute; en qui&eacute;n decide</b>
+      <span>En Modo Plan el estudiante tiene que leer y corregir antes de ver el resultado. La IA deja de ser «la que hace la tarea» y pasa a ser «la que ayuda a revisar tu propia idea».</span>
+    </div>
+  </div>
+  <div class="foot"><span>El detalle clave</span><span><b>05</b> / 09</span></div>
+</section>
+
+<!-- ========== 6 · CUATRO USOS EN EDUCACIÓN ========== -->
+<section class="slide" data-title="Cuatro usos en educación" data-notes="Cuatro usos concretos, de los más sencillos a los más avanzados. Da un ejemplo rápido de cada uno. Si solo puedes explicar dos, explica el primero y el cuarto: el tutor personal es lo que más impacta en un grupo grande, y la revisión antes de entregar es lo que más puede cambiar la nota del alumno. Cierra con la idea de /share para el profesor.">
+  <div class="slide-head">
+    <div class="eyebrow"><span class="bar"></span>06 &middot; Aplicaciones</div>
+    <h2>Cuatro usos <em>en educaci&oacute;n</em></h2>
+    <p class="sub">No es una herramienta del futuro: son cuatro cosas que se pueden aplicar el pr&oacute;ximo lunes.</p>
+  </div>
+  <div class="body">
+    <div class="grid g22">
+      <div class="card"><div class="num">01</div><h3>Tutor personal</h3><p>El alumno practica a su ritmo, sin ocupar al profesor ni quedarse esperando turno.</p></div>
+      <div class="card"><div class="num">02</div><h3>Explicar errores</h3><p>Se le pasa el mensaje de error y se le pide que lo explique <em>antes</em> de darle la soluci&oacute;n.</p></div>
+      <div class="card"><div class="num">03</div><h3>Ejercicios a medida</h3><p>Genera m&aacute;s ejercicios del mismo tipo con otros datos, justo donde el alumno se equivoc&oacute;.</p></div>
+      <div class="card"><div class="num">04</div><h3>Revisi&oacute;n de la tarea</h3><p>El alumno pide una revisi&oacute;n cr&iacute;tica y detecta lo que el profesor iba a marcar.</p></div>
+    </div>
+    <div class="callout">
+      <b>Y para el profesor</b>
+      <span>Con <code class="k">/share</code> el alumno entrega la conversaci&oacute;n completa. El docente ya no solo ve el resultado: ve c&oacute;mo lleg&oacute; a &eacute;l.</span>
+    </div>
+  </div>
+  <div class="foot"><span>Aplicaciones</span><span><b>06</b> / 09</span></div>
+</section>
+
+<!-- ========== 7 · QUÉ CAMBIA PARA QUIEN APRENDE Y PARA QUIEN ENSEÑA ========== -->
+<section class="slide" data-title="Qué cambia para quien aprende y para quien enseña" data-notes="Esta es la l&aacute;mina que responde al tema de la exposici&oacute;n. Dos columnas, una para el alumno y otra para el docente. L&eacute;ela en voz alta kontrastando las dos. El punto fuerte es el &uacute;ltimo del alumno: aprender a preguntar. Dilo as&iacute;: aunque ma&ntilde;ana desaparezca la herramienta, esa habilidad se queda.">
+  <div class="slide-head">
+    <div class="eyebrow"><span class="bar"></span>07 &middot; El impacto</div>
+    <h2>Qu&eacute; cambia <em>para quien aprende y para quien ense&ntilde;a</em></h2>
+  </div>
+  <div class="body">
+    <div class="grid g2 modes">
+      <div class="mode b cols">
+        <span class="badge">El estudiante</span>
+        <ul>
+          <li>Practica a su ritmo, sin esperar turno ni esperar al d&iacute;a siguiente</li>
+          <li>Pregunta lo b&aacute;sico sin pena, que es la duda que nunca se atreve a hacer</li>
+          <li>Experimenta sin miedo, porque todo se puede deshacer con <code class="k">/undo</code></li>
+          <li>Aprende a formular bien lo que quiere: la habilidad m&aacute;s dif&iacute;cil</li>
+        </ul>
+      </div>
+      <div class="mode cols">
+        <span class="badge">El docente</span>
+        <ul>
+          <li>Deja de repetir la misma explicaci&oacute;n por quinta vez en el taller</li>
+          <li>Puede darle a cada alumno ejercicios distintos, con datos distintos</li>
+          <li>Con <code class="k">/share</code> revisa el proceso, no solo el resultado</li>
+          <li>Dedica la clase a discutir y decidir, que es lo que solo &eacute;l puede hacer</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout">
+      <b>El estudiante no pierde, cambia de lugar</b>
+      <span>Pasa de copiar la respuesta a evaluar la respuesta. Esa es la diferencia entre entender y memorizar.</span>
+    </div>
+  </div>
+  <div class="foot"><span>El impacto</span><span><b>07</b> / 09</span></div>
+</section>
+
+<!-- ========== 8 · SUS LÍMITES ========== -->
+<section class="slide" data-title="Sus límites" data-notes="No te saltes esta l&aacute;mina: es lo que hace cre&iacute;ble la exposici&oacute;n. Sé honesto, sin disculparte. El punto m&aacute;s importante es el &uacute;ltimo: los l&iacute;mites no son de la herramienta, son de c&oacute;mo la usemos. Si te preguntan cu&aacute;nto cuesta, la respuesta es la segunda: el programa es gratis, el modelo de IA que se conecta normalmente se paga, aunque hay opciones gratuitas.">
+  <div class="slide-head">
+    <div class="eyebrow"><span class="bar"></span>08 &middot; Los l&iacute;mites</div>
+    <h2>Lo que <em>tiene que resolver uno</em></h2>
+    <p class="sub">Una herramienta que solo tiene ventajas no es cre&iacute;ble. Estos son los cuatro problemas reales de OpenCode.</p>
+  </div>
+  <div class="body">
+    <div class="grid g22">
+      <div class="card risk"><div class="num">01</div><h3>Puede resolverlo todo por ti</h3><p>El mayor riesgo: el alumno entrega un proyecto funcionando que no sabe explicar.</p></div>
+      <div class="card risk"><div class="num">02</div><h3>Se equivoca con seguridad</h3><p>A veces inventa funciones que no existen y lo dice como si fuera verdad.</p></div>
+      <div class="card risk"><div class="num">03</div><h3>El programa es gratis, la IA no siempre</h3><p>Los modelos m&aacute;s potentes son de pago, aunque existen opciones gratuitas.</p></div>
+      <div class="card risk"><div class="num">04</div><h3>El c&oacute;digo sale de tu computadora</h3><p>Lo que escribes se env&iacute;a al servidor del modelo que est&eacute;s usando.</p></div>
+    </div>
+    <div class="callout warn">
+      <b>Pero el problema no son los l&iacute;mites: es no ponerlos</b>
+      <span>Con cuatro reglas sencillas &mdash;que son las m&iacute;as&mdash; los cuatro riesgos de esta l&aacute;mina desaparecen. Las menciono al final.</span>
+    </div>
+  </div>
+  <div class="foot"><span>Los l&iacute;mites</span><span><b>08</b> / 09</span></div>
+</section>
+
+<!-- ========== 9 · CONCLUSIÓN Y GRACIAS ========== -->
+<section class="slide end" data-title="Conclusión y gracias" data-notes="Cierra con calma. Repasa las cuatro reglas, que son la respuesta directa a la l&aacute;mina anterior y lo m&aacute;s valioso de la exposici&oacute;n. Agradece y abre el turno de preguntas. Si te piden demostraci&oacute;n en vivo, este es el mejor momento. Una pregunta para relanzar al p&uacute;blico: qu&eacute; tarea de su propia carrera les gustar&iacute;a resolver con una IA?">
+  <div class="slide-head">
+    <div class="eyebrow"><span class="bar"></span>09 &middot; Conclusi&oacute;n</div>
+    <h1>Aplicada a la educaci&oacute;n, OpenCode no reemplaza al estudiante: <em>lo acompa&ntilde;a</em>.</h1>
+  </div>
+  <div class="body">
+    <div class="rules">
+      <div class="rule"><div class="n">1</div><div><b>Nadie entrega algo que no pueda explicar</b><span>Si no sabe explicar cada l&iacute;nea, todav&iacute;a no es trabajo suyo.</span></div></div>
+      <div class="rule"><div class="n">2</div><div><b>Empezar siempre en Modo Plan</b><span>Pedir el resultado terminado es saltarse el aprendizaje.</span></div></div>
+      <div class="rule"><div class="n">3</div><div><b>Preguntar siempre el porqu&eacute;</b><span>Es la pregunta que convierte un resultado en conocimiento.</span></div></div>
+      <div class="rule"><div class="n">4</div><div><b>Entregar tambi&eacute;n el proceso</b><span>Con <code class="k">/share</code> se ve c&oacute;mo lleg&oacute; a su respuesta.</span></div></div>
+    </div>
+    <div class="meta">
+      <div class="tagchip">Sitio: <b>opencode.ai</b></div>
+      <div class="tagchip">C&oacute;digo abierto: <b>github.com/anomalyco/opencode</b></div>
+      <div class="tagchip">Gracias por su atenci&oacute;n &middot; &iquest;Preguntas?</div>
+    </div>
+  </div>
+  <div class="foot"><span>Gracias por su atenci&oacute;n</span><span><b>09</b> / 09</span></div>
+</section>
+
+</div><!-- /stage -->
+</div><!-- /viewport -->
+
+<div id="bar"></div>
+
+<div id="nav">
+  <button id="prev" title="Anterior (←)">‹</button>
+  <button id="next" title="Siguiente (→)">›</button>
+</div>
+
+<div id="overview">
+  <h4>Vista general</h4>
+  <div class="hint">Clic en una miniatura para saltar a esa l&aacute;mina &middot; ESC para cerrar</div>
+  <div id="thumbs"></div>
+</div>
+
+<div id="notes">
+  <div class="lbl">Notas del presentador</div>
+  <p id="noteText"></p>
+</div>
+
+<div id="help">
+  <div class="box">
+    <h3>Atajos de teclado</h3>
+    <div class="row"><span>Diapositiva siguiente</span><span><kbd>→</kbd><kbd>Espacio</kbd><kbd>PgDn</kbd></span></div>
+    <div class="row"><span>Diapositiva anterior</span><span><kbd>←</kbd><kbd>PgUp</kbd></span></div>
+    <div class="row"><span>Primera / última</span><span><kbd>Inicio</kbd><kbd>Fin</kbd></span></div>
+    <div class="row"><span>Reiniciar la lámina</span><span><kbd>R</kbd></span></div>
+    <div class="row"><span>Vista general</span><span><kbd>O</kbd></span></div>
+    <div class="row"><span>Notas del presentador</span><span><kbd>N</kbd></span></div>
+    <div class="row"><span>Pantalla completa</span><span><kbd>F</kbd></span></div>
+    <div class="row"><span>Pantalla en negro</span><span><kbd>B</kbd></span></div>
+    <div class="row"><span>Ayuda</span><span><kbd>?</kbd></span></div>
+    <div class="cls">Pulsa <kbd>Esc</kbd> para cerrar</div>
+  </div>
+</div>
+
+<div id="blank"></div>
+
+<script>
+/* ---------- TÍTULOS DE CINE ---------- */
+(function(){
+  var intro = document.getElementById('intro');
+  if (!intro) return;
+  var OUT = 8500, LEN = 8900, FPS = 24;
+  var t0 = Date.now(), outT, goneT, ended = false, raf;
+  var tc = document.getElementById('tc');
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  (function tick(){
+    if (tc && !ended){
+      var f = Math.floor(Math.min(LEN, Date.now() - t0) / 1000 * FPS);
+      tc.textContent = '00:' + pad2(Math.floor(f / (FPS * 60))) + ':'
+                     + pad2(Math.floor(f / FPS) % 60) + ':' + pad2(f % FPS);
+    }
+    if (!ended) raf = requestAnimationFrame(tick);
+  })();
+  function finish(){
+    if (ended) return;
+    ended = true;
+    if (raf) cancelAnimationFrame(raf);
+    intro.classList.add('out');
+    goneT = setTimeout(function(){ intro.classList.add('gone'); }, 560);
+    try { document.dispatchEvent(new CustomEvent('intro:done')); } catch(e){}
+  }
+  outT = setTimeout(finish, OUT);
+  function skip(e){
+    if (e.type === 'keydown' && (e.key === 'Tab' || e.key === 'F5')) return;
+    clearTimeout(outT); clearTimeout(goneT);
+    finish();
+  }
+  intro.addEventListener('click', skip);
+  document.addEventListener('keydown', skip);
+})();
+
+/* ---------- PRESENTACIÓN ---------- */
+(function(){
+  var stage    = document.getElementById('stage');
+  var slides   = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var bar      = document.getElementById('bar');
+  var overview = document.getElementById('overview');
+  var thumbs   = document.getElementById('thumbs');
+  var notes    = document.getElementById('notes');
+  var noteText = document.getElementById('noteText');
+  var help     = document.getElementById('help');
+  var blank    = document.getElementById('blank');
+  var total    = slides.length;
+  var idx      = 0;
+
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+
+  function fit(){
+    var vw = window.innerWidth  || document.documentElement.clientWidth  || 1280;
+    var vh = window.innerHeight || document.documentElement.clientHeight || 720;
+    stage.style.transform = 'scale(' + Math.min(vw / 1280, vh / 720) + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  /* CASCADA
+     reparte los índices de animación por niveles:
+     --i  bloques de primer nivel   (encabezado y cuerpo)
+     --k  tarjetas, modos y reglas (segundo nivel)
+     --j  filas e ítems de lista    (tercer nivel, reinicia en cada columna) */
+  function cascade(sl){
+    var cont = [].slice.call(sl.children).filter(function(c){
+      return !c.classList.contains('foot') && !c.classList.contains('cover-art');
+    });
+    ['.slide-head', '.body'].forEach(function(sel){
+      [].slice.call(sl.querySelectorAll(sel)).forEach(function(box){
+        cont = cont.concat([].slice.call(box.children));
+      });
+    });
+    /* el aviso final cierra: siempre entra el último */
+    cont = cont.filter(function(el){ return !el.classList.contains('callout'); })
+               .concat(cont.filter(function(el){ return el.classList.contains('callout'); }));
+    cont.forEach(function(el, i){ el.style.setProperty('--i', i); });
+
+    [].slice.call(sl.querySelectorAll('.card, .mode, .rules > .rule')).forEach(function(el, i){
+      el.style.setProperty('--k', i);
+    });
+    [].slice.call(sl.querySelectorAll('.rows, .mode')).forEach(function(box){
+      [].slice.call(box.children).forEach(function(el, i){ el.style.setProperty('--j', i); });
+    });
+  }
+
+  /* cifras con count-up: el número y el sufijo van en nodos separados */
+  function countUp(sl){
+    [].slice.call(sl.querySelectorAll('.stat .v')).forEach(function(el){
+      var raw = el.textContent.trim();
+      var m = raw.match(/^(\d+)(.*)$/);
+      if (!m) return;
+      var target = parseInt(m[1], 10);
+      var suffix = m[2];
+      el.textContent = '';
+      var num = document.createElement('b');
+      num.textContent = '0';
+      el.appendChild(num);
+      if (suffix){
+        var sp = document.createElement('span');
+        sp.textContent = suffix;
+        el.appendChild(sp);
+      }
+      if (target === 0){ num.textContent = '0'; return; }
+      var t0 = null;
+      (function step(ts){
+        if (!t0) t0 = ts;
+        var k = Math.min(1, (ts - t0) / 900);
+        num.textContent = String(Math.round(target * (1 - Math.pow(1 - k, 3))));
+        if (k < 1) requestAnimationFrame(step);
+      })(performance.now());
+    });
+  }
+
+  /* monta la lámina: reflow → cascada → entrada. `back` invierte la dirección */
+  function mount(sl, back){
+    sl.classList.remove('active');
+    void sl.offsetWidth;                 /* reflow: reinicia las animaciones */
+    cascade(sl);
+    sl.style.setProperty('--enter', back ? '-26px' : '26px');
+    sl.classList.add('active');
+    setTimeout(function(){ countUp(sl); }, back ? 0 : 420);
+  }
+
+  function restart(){
+    /* invariante del archivo: nunca puede haber dos láminas activas */
+    for (var q = 0; q < slides.length; q++){
+      if (q !== idx) slides[q].classList.remove('active', 'leaving');
+    }
+    mount(slides[idx]);
+  }
+
+  function go(n){
+    n = Math.max(0, Math.min(total - 1, n));
+    if (n === idx) return;
+    var back = n < idx;
+    var out = slides[idx];
+    out.classList.remove('back');
+    if (back) out.classList.add('back');
+    out.classList.add('leaving');
+    setTimeout(function(){ out.classList.remove('leaving', 'back'); }, 300);
+    /* solo una lámina activa: nunca puede haber dos */
+    for (var q = 0; q < slides.length; q++){
+      if (q !== n) slides[q].classList.remove('active');
+    }
+    idx = n;
+    mount(slides[idx], back);
+    bar.style.width = ((idx + 1) / total * 100) + '%';
+    noteText.textContent = slides[idx].dataset.notes || 'Sin notas para esta l&aacute;mina.';
+    if (slides[idx].dataset.video === 'tape') playTape(); else stopTape();
+    Array.prototype.forEach.call(thumbs.children, function(t, i){
+      t.classList.toggle('cur', i === idx);
+    });
+  }
+  function next(){ go(idx + 1); }
+  function prev(){ go(idx - 1); }
+
+  /* ---------- SESIÓN DE OPENCODE ANIMADA ---------- */
+  var chat      = document.getElementById('chat');
+  var cbox      = document.getElementById('cbox');
+  var cmode     = document.getElementById('cmode');
+  var ctext     = document.getElementById('ctext');
+  var ccaret    = document.getElementById('ccaret');
+  var sbModeTxt = document.getElementById('sbModeTxt');
+  var vidfill   = document.getElementById('vidfill');
+  var replay    = document.getElementById('replay');
+  var TAPE_LEN  = 35500, timers = [];
+
+  function scroll(){ if (chat) chat.scrollTop = chat.scrollHeight; }
+
+  function typeInto(el, txt, sp){
+    var i = 0;
+    (function step(){
+      el.textContent = txt.slice(0, ++i);
+      scroll();
+      if (i < txt.length) timers.push(setTimeout(step, sp));
+    })();
+  }
+  function addMsg(who, txt, sp){
+    var d = document.createElement('div');
+    d.className = 'm ' + who;
+    var lbl = document.createElement('span');
+    lbl.className = 'who'; lbl.textContent = who;
+    var p = document.createElement('p');
+    d.appendChild(lbl); d.appendChild(p);
+    chat.appendChild(d); scroll();
+    typeInto(p, txt, sp);
+  }
+  function addThink(txt){
+    var d = document.createElement('div');
+    d.className = 'm think';
+    var sp = document.createElement('span'); sp.className = 'spin';
+    var p = document.createElement('p');
+    d.appendChild(sp); d.appendChild(p);
+    chat.appendChild(d); scroll();
+    typeInto(p, txt, 16);
+  }
+  function addTool(label, path){
+    var d = document.createElement('div');
+    d.className = 'tl';
+    var a = document.createElement('span'); a.className = 'ti'; a.textContent = label;
+    var b = document.createElement('span'); b.className = 'tp'; b.textContent = path;
+    d.appendChild(a); d.appendChild(b);
+    chat.appendChild(d); scroll();
+  }
+  function addPlan(txt){
+    var d = document.createElement('div');
+    d.className = 'pl'; d.textContent = txt;
+    chat.appendChild(d); scroll();
+  }
+  function typeComposer(txt){
+    ccaret.style.display = 'block';
+    var i = 0;
+    (function step(){
+      ctext.textContent = txt.slice(0, ++i);
+      if (i < txt.length) timers.push(setTimeout(step, 40));
+      else ccaret.style.display = 'none';
+    })();
+  }
+  function send(){
+    var t = ctext.textContent;
+    if (!t) return;
+    ctext.textContent = '';
+    var d = document.createElement('div');
+    d.className = 'm u';
+    var lbl = document.createElement('span');
+    lbl.className = 'who'; lbl.textContent = 'tú';
+    var p = document.createElement('p'); p.textContent = t;
+    d.appendChild(lbl); d.appendChild(p);
+    chat.appendChild(d); scroll();
+  }
+  function setMode(m){
+    cmode.textContent = m;
+    sbModeTxt.textContent = m + ' mode';
+    cbox.classList.toggle('plan', m === 'plan');
+  }
+
+  var SCRIPT = [
+    [  400,'c','Necesito una página para registrar productos: nombre, cantidad y precio.'],
+    [ 4200,'s'],
+    [ 4400,'k','leyendo el proyecto…'],
+    [ 5400,'a','Voy a revisar primero cómo está armado el proyecto.'],
+    [ 6900,'t','read','src/App.jsx'],
+    [ 7500,'t','read','src/data/inventory.json'],
+    [ 8100,'t','read','src/components/Table.jsx'],
+    [ 8900,'a','Listo. Ahora sí entiendo cómo funciona.'],
+    [11200,'c','Agrégalo, pero que la lista NO se ordene por nombre.'],
+    [14400,'s'],
+    [14600,'m','plan'],
+    [15800,'a','Entendido. Este es el plan que propongo:'],
+    [17600,'p','1.  Formulario de captura con validación'],
+    [18800,'p','2.  Búsqueda en vivo sobre la lista'],
+    [20000,'p','3.  Resaltar los productos que llegaron a cero'],
+    [21600,'c','Perfecto. Hazlo.'],
+    [23200,'s'],
+    [23400,'m','build'],
+    [24800,'a','Aplicando los cambios.'],
+    [26600,'t','write','src/components/ProductForm.jsx'],
+    [27600,'t','write','src/components/SearchBar.jsx'],
+    [28600,'t','write','src/hooks/useProducts.js'],
+    [29600,'t','write','src/App.jsx'],
+    [31200,'a','Listo: 6 archivos creados y la aplicación sigue funcionando.'],
+    [33800,'a','Una duda antes de que entregues: ¿por qué guardé la cantidad como número y no como texto?']
+  ];
+
+  function stopTape(){
+    timers.forEach(function(t){ clearTimeout(t); clearInterval(t); });
+    timers = [];
+    if (chat) chat.innerHTML = '';
+    if (ctext) ctext.textContent = '';
+    if (vidfill) vidfill.style.width = '0%';
+    if (ccaret) ccaret.style.display = 'none';
+    if (cbox) cbox.classList.remove('plan');
+    if (cmode) cmode.textContent = 'build';
+    if (sbModeTxt) sbModeTxt.textContent = 'build mode';
+  }
+  function playTape(){
+    if (!chat) return;
+    stopTape();
+    setMode('build');
+    var start = Date.now();
+    SCRIPT.forEach(function(step){
+      timers.push(setTimeout(function(){
+        switch (step[1]){
+          case 'c': typeComposer(step[2]); break;
+          case 's': send(); break;
+          case 'a': addMsg('opencode', step[2], 18); break;
+          case 'k': addThink(step[2]); break;
+          case 't': addTool(step[2], step[3]); break;
+          case 'p': addPlan(step[2]); break;
+          case 'm': setMode(step[2]); break;
+        }
+      }, step[0]));
+    });
+    timers.push(setInterval(function(){
+      vidfill.style.width = Math.min(100, (Date.now() - start) / TAPE_LEN * 100) + '%';
+    }, 120));
+    timers.push(setTimeout(function(){ vidfill.style.width = '100%'; }, TAPE_LEN));
+  }
+  if (replay) replay.addEventListener('click', function(e){ e.stopPropagation(); playTape(); });
+
+  /* ---------- MIN I A T U R A S ---------- */
+  slides.forEach(function(s, i){
+    var t = document.createElement('div');
+    t.className = 'thumb';
+    var n = document.createElement('div');
+    n.className = 'tn'; n.textContent = pad(i + 1);
+    var tt = document.createElement('div');
+    tt.className = 'tt'; tt.textContent = s.dataset.title || '';
+    t.appendChild(n); t.appendChild(tt);
+    t.addEventListener('click', function(){ go(i); overview.classList.remove('on'); });
+    thumbs.appendChild(t);
+  });
+
+  function fullscreen(){
+    if (!document.fullscreenElement){
+      var r = document.documentElement.requestFullscreen;
+      if (r) r.call(document.documentElement);
+    } else { document.exitFullscreen(); }
+  }
+  function closeAll(){
+    overview.classList.remove('on');
+    notes.classList.remove('on');
+    help.classList.remove('on');
+  }
+
+  document.getElementById('next').addEventListener('click', next);
+  document.getElementById('prev').addEventListener('click', prev);
+
+  document.addEventListener('keydown', function(e){
+    var k = e.key;
+    if (k === 'Escape'){ closeAll(); return; }
+    if (k === 'ArrowRight' || k === ' ' || k === 'PageDown' || k === 'ArrowDown'){ e.preventDefault(); next(); return; }
+    if (k === 'ArrowLeft' || k === 'PageUp' || k === 'ArrowUp'){ e.preventDefault(); prev(); return; }
+    if (k === 'Home'){ e.preventDefault(); go(0); return; }
+    if (k === 'End'){ e.preventDefault(); go(total - 1); return; }
+    var l = k.toLowerCase();
+    if (l === 'r'){ restart(); return; }
+    if (l === 'o'){ overview.classList.toggle('on'); return; }
+    if (l === 'n'){ notes.classList.toggle('on'); return; }
+    if (l === 'f'){ fullscreen(); return; }
+    if (l === 'b'){ blank.classList.toggle('on'); return; }
+    if (k === '?'){ help.classList.toggle('on'); return; }
+  });
+
+  var tx = 0, ty = 0;
+  document.addEventListener('touchstart', function(e){ tx = e.changedTouches[0].clientX; ty = e.changedTouches[0].clientY; }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    var dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)){ dx < 0 ? next() : prev(); }
+  }, {passive:true});
+
+  document.getElementById('viewport').addEventListener('click', function(e){
+    if (overview.classList.contains('on')) return;
+    var x = e.clientX / window.innerWidth;
+    if (x > 0.85) next(); else if (x < 0.15) prev();
+  });
+
+  /* ---------- ARRANQUE ---------- */
+  mount(slides[0]);
+  bar.style.width = (1 / total * 100) + '%';
+  noteText.textContent = slides[0].dataset.notes || '';
+  thumbs.children[0].classList.add('cur');
+
+  /* cuando la intro termina, la portada vuelve a entrar animada */
+  document.addEventListener('intro:done', function(){
+    setTimeout(function(){ if (idx === 0) restart(); }, 320);
+  });
+})();
+</script>
+</body>
+</html>
